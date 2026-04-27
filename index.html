@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solana Whale Tracker — GoldRush</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f172a'/><text x='16' y='22' font-size='18' text-anchor='middle'>🐋</text></svg>">
+<style>
+:root{--bg:#060a12;--bg2:#0d1421;--bg3:#111d2e;--border:#1a2a3f;--sol:#9945ff;--green:#14f195;--blue:#3b82f6;--cyan:#06b6d4;--warn:#f59e0b;--danger:#ef4444;--text:#e2e8f0;--mid:#7c8fa8;--dim:#3d5068;--mono:'Courier New',monospace;--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;font-size:16px}
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:18px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.brand{display:flex;align-items:center;gap:14px}
+.brand-icon{width:46px;height:46px;background:linear-gradient(135deg,var(--sol),var(--green));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px}
+.brand-name{font-size:22px;font-weight:800;letter-spacing:-0.5px}
+.brand-name span{color:var(--green)}
+.brand-sub{font-size:12px;color:var(--dim);font-family:var(--mono);margin-top:2px}
+.powered{font-family:var(--mono);font-size:12px;color:var(--dim);border:1px solid var(--border);padding:8px 14px;border-radius:8px}
+.powered span{color:var(--green)}
+.hero{background:linear-gradient(180deg,var(--bg2) 0%,var(--bg) 100%);padding:52px 32px;border-bottom:1px solid var(--border);text-align:center}
+.hero h1{font-size:40px;font-weight:800;letter-spacing:-1px;margin-bottom:10px}
+.hero h1 span{color:var(--green)}
+.hero p{font-size:17px;color:var(--mid);margin-bottom:36px}
+.search-box{max-width:740px;margin:0 auto;display:flex;gap:12px}
+.search-input{flex:1;background:var(--bg3);border:2px solid var(--border);border-radius:12px;padding:18px 22px;color:var(--text);font-family:var(--mono);font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
+.search-input:focus{border-color:var(--green);box-shadow:0 0 0 4px rgba(20,241,149,.08)}
+.search-input::placeholder{color:var(--dim)}
+.btn-track{padding:18px 32px;background:linear-gradient(135deg,var(--sol),#7c3aed);border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s,transform .1s;min-width:170px}
+.btn-track:hover{opacity:.9;transform:translateY(-1px)}
+.btn-track:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.quick-row{max-width:740px;margin:18px auto 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+.quick-lbl{font-size:13px;color:var(--dim);font-family:var(--mono)}
+.quick-btn{padding:10px 18px;border-radius:8px;border:1px solid rgba(20,241,149,.2);background:rgba(20,241,149,.06);color:var(--green);font-size:14px;font-weight:600;cursor:pointer;transition:background .15s}
+.quick-btn:hover{background:rgba(20,241,149,.14)}
+.api-row{max-width:740px;margin:18px auto 0;display:flex;align-items:center;gap:12px;justify-content:center}
+.api-lbl{font-size:13px;color:var(--dim);font-family:var(--mono);white-space:nowrap}
+.api-input{width:320px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 16px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none}
+.api-input:focus{border-color:var(--sol)}
+main{padding:32px;max-width:1200px;margin:0 auto}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:22px 24px;position:relative;overflow:hidden}
+.stat::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat:nth-child(1)::after{background:linear-gradient(90deg,var(--sol),var(--green))}
+.stat:nth-child(2)::after{background:var(--blue)}
+.stat:nth-child(3)::after{background:var(--warn)}
+.stat:nth-child(4)::after{background:var(--cyan)}
+.stat-lbl{font-size:11px;color:var(--dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
+.stat-val{font-size:30px;font-weight:800;line-height:1}
+.stat-val.g{color:var(--green)}.stat-val.b{color:var(--blue)}.stat-val.y{color:var(--warn)}.stat-val.c{color:var(--cyan)}
+.stat-sub{font-size:13px;color:var(--dim);margin-top:6px}
+.addr-bar{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.addr-lbl{font-size:11px;color:var(--dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.addr-val{font-family:var(--mono);font-size:14px;color:var(--green);word-break:break-all}
+.copy-btn{padding:10px 18px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--mid);font-size:14px;cursor:pointer;white-space:nowrap;transition:color .15s}
+.copy-btn:hover{color:var(--green);border-color:rgba(20,241,149,.3)}
+.risk-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:26px;display:flex;align-items:center;gap:26px;margin-bottom:26px}
+.risk-circle{width:92px;height:92px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:3px solid;flex-shrink:0}
+.risk-circle.low{border-color:var(--green);background:rgba(20,241,149,.08)}
+.risk-circle.med{border-color:var(--warn);background:rgba(245,158,11,.08)}
+.risk-circle.high{border-color:var(--danger);background:rgba(239,68,68,.08)}
+.risk-num{font-size:28px;font-weight:800;line-height:1}
+.risk-num.low{color:var(--green)}.risk-num.med{color:var(--warn)}.risk-num.high{color:var(--danger)}
+.risk-sub-lbl{font-size:9px;color:var(--dim);font-family:var(--mono);letter-spacing:1px;margin-top:3px}
+.risk-body{flex:1}
+.risk-title{font-size:18px;font-weight:700;margin-bottom:14px}
+.risk-flags{display:flex;flex-wrap:wrap;gap:8px}
+.rflag{font-size:13px;padding:7px 14px;border-radius:6px;font-family:var(--mono);border:1px solid}
+.rflag.ok{color:var(--green);border-color:rgba(20,241,149,.25);background:rgba(20,241,149,.06)}
+.rflag.warn{color:var(--warn);border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.06)}
+.rflag.bad{color:var(--danger);border-color:rgba(239,68,68,.25);background:rgba(239,68,68,.06)}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sec-title{font-size:13px;font-weight:700;color:var(--mid);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px}
+.sec-tag{font-family:var(--mono);font-size:11px;color:var(--green);border:1px solid rgba(20,241,149,.2);background:rgba(20,241,149,.05);padding:5px 12px;border-radius:4px;letter-spacing:1px}
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:26px}
+table{width:100%;border-collapse:collapse}
+th{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;padding:16px 20px;text-align:left;background:var(--bg3);border-bottom:1px solid var(--border)}
+th:last-child,td:last-child{text-align:right;padding-right:20px}
+td{padding:18px 20px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.015)}
+.tok-cell{display:flex;align-items:center;gap:14px}
+.tok-logo{width:42px;height:42px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--mid)}
+.tok-logo img{width:100%;height:100%;object-fit:cover}
+.tok-name{font-size:15px;font-weight:700}
+.tok-sym{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:2px}
+.mono{font-family:var(--mono);font-size:13px}
+.green{color:var(--green)}.dim-c{color:var(--dim)}
+.pct-wrap{display:flex;align-items:center;gap:10px}
+.pct-bar{height:5px;border-radius:3px;background:linear-gradient(90deg,var(--sol),var(--green));min-width:3px}
+.pct-txt{font-family:var(--mono);font-size:12px;color:var(--mid);min-width:46px}
+.state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:16px;color:var(--dim);text-align:center}
+.state-icon{font-size:60px;opacity:.35}
+.state-title{font-size:22px;font-weight:700;color:var(--mid)}
+.state-sub{font-family:var(--mono);font-size:13px;max-width:400px;line-height:1.7}
+.state-sub a{color:var(--green);text-decoration:none}
+.spinner{width:46px;height:46px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.api-counter{position:fixed;bottom:24px;right:24px;z-index:200;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 18px}
+.api-counter-lbl{font-family:var(--mono);font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+.api-counter-val{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--cyan)}
+.api-counter-sub{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:2px}
+.fade{animation:fade .4s ease forwards}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+footer{text-align:center;padding:26px;font-family:var(--mono);font-size:12px;color:var(--dim);border-top:1px solid var(--border)}
+footer a{color:var(--green);text-decoration:none}
+@media(max-width:700px){header,main{padding:14px}.hero{padding:32px 14px}.stats-grid{grid-template-columns:repeat(2,1fr)}.search-box{flex-direction:column}th:nth-child(3),td:nth-child(3),th:nth-child(5),td:nth-child(5){display:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="brand-icon">🐋</div>
+    <div>
+      <div class="brand-name">Solana Whale <span>Tracker</span></div>
+      <div class="brand-sub">On-chain Portfolio Intelligence</div>
+    </div>
+  </div>
+  <div class="powered">Powered by <span>GoldRush</span> · Covalent</div>
+</header>
+
+<div class="hero">
+  <h1>Track any <span>Solana</span> wallet</h1>
+  <p>Full portfolio breakdown, risk analysis, and token holdings — powered by GoldRush multichain data</p>
+  <div class="search-box">
+    <input type="text" class="search-input" id="addrInput" placeholder="Enter Solana wallet address...">
+    <button class="btn-track" id="trackBtn" onclick="track()">🔍 Track Wallet</button>
+  </div>
+  <div class="quick-row">
+    <span class="quick-lbl">Try example:</span>
+    <button class="quick-btn" onclick="load('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM')">🐋 Binance Whale</button>
+    <button class="quick-btn" onclick="load('GThUX1Atko4tqhN2NaiTazWSeFWMuiUvfFnyJyUghFMJ')">⚡ Jupiter Fund</button>
+    <button class="quick-btn" onclick="load('5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9')">🔥 Foundation</button>
+  </div>
+  <div class="api-row">
+    <span class="api-lbl">GOLDRUSH KEY:</span>
+    <input type="text" class="api-input" id="apiKey" placeholder="cqt_..." value="cqt_rQDWYbrWRtKfJgBTmTfD7TRtpBm4">
+  </div>
+</div>
+
+<main>
+  <div id="content">
+    <div class="state">
+      <div class="state-icon">🐋</div>
+      <div class="state-title">Enter a wallet address to begin</div>
+      <div class="state-sub">Paste any Solana wallet address above or click one of the example wallets to see a full portfolio breakdown with safety analysis</div>
+    </div>
+  </div>
+</main>
+
+<div class="api-counter">
+  <div class="api-counter-lbl">API Calls</div>
+  <div class="api-counter-val" id="cnt">0</div>
+  <div class="api-counter-sub">goldrush</div>
+</div>
+
+<footer>
+  Built with <a href="https://goldrush.dev" target="_blank">GoldRush by Covalent</a> &nbsp;·&nbsp; #GoldRush &nbsp;·&nbsp;
+  <a href="https://x.com/plus8bit" target="_blank">@plus8bit</a> &nbsp;·&nbsp; Solana Frontier Hackathon 2026
+</footer>
+
+<script>
+let calls=0;
+function inc(){calls++;document.getElementById('cnt').textContent=calls;}
+async function apiFetch(path){
+  const key=document.getElementById('apiKey').value.trim();
+  const sep=path.includes('?')?'&':'?';
+  const url=`https://api.covalenthq.com/v1${path}${sep}key=${key}`;
+  const r=await fetch(url,{headers:{'Accept':'application/json'}});
+  inc();
+  if(!r.ok){const t=await r.text();throw new Error(t||`HTTP ${r.status}`);}
+  return r.json();
+}
+function fU(n){if(!n||isNaN(n))return'—';if(n>=1e9)return'$'+(n/1e9).toFixed(2)+'B';if(n>=1e6)return'$'+(n/1e6).toFixed(2)+'M';if(n>=1e3)return'$'+(n/1e3).toFixed(1)+'K';if(n>=1)return'$'+n.toFixed(2);return'$'+n.toFixed(4);}
+function fB(raw,dec){if(!raw||!dec)return'0';const v=parseFloat(raw)/Math.pow(10,dec);if(v>=1e9)return(v/1e9).toFixed(2)+'B';if(v>=1e6)return(v/1e6).toFixed(2)+'M';if(v>=1e3)return(v/1e3).toFixed(2)+'K';if(v>=1)return v.toFixed(2);if(v>0)return v.toFixed(4);return'0';}
+function short(a){return a?a.slice(0,6)+'...'+a.slice(-4):'';}
+function calcRisk(items){
+  let s=100,flags=[];
+  const spam=items.filter(i=>i.is_spam).length;
+  const total=items.reduce((a,i)=>a+(i.quote||0),0);
+  const topPct=items[0]&&total>0?(items[0].quote/total*100):0;
+  if(spam>5){s-=20;flags.push({l:spam+' spam tokens',c:'bad'});}
+  else if(spam>0){s-=5;flags.push({l:spam+' spam token(s)',c:'warn'});}
+  else flags.push({l:'No spam detected',c:'ok'});
+  if(topPct>80){s-=15;flags.push({l:'Concentration: '+topPct.toFixed(0)+'% in one token',c:'warn'});}
+  else flags.push({l:'Diversified portfolio',c:'ok'});
+  if(total>1e6)flags.push({l:'Whale wallet (>$1M)',c:'ok'});
+  else if(total>100000)flags.push({l:'Large wallet (>$100K)',c:'ok'});
+  else flags.push({l:'Retail wallet',c:'warn'});
+  const ver=items.filter(i=>i.supports_erc&&i.supports_erc.includes('verified')).length;
+  if(ver>3)flags.push({l:ver+' verified tokens',c:'ok'});
+  return{s:Math.max(0,Math.min(100,s)),flags};
+}
+function rc(s){return s>=70?'low':s>=40?'med':'high';}
+function rl(s){return s>=70?'LOW RISK':s>=40?'MEDIUM':'HIGH RISK';}
+async function track(){
+  const addr=document.getElementById('addrInput').value.trim();
+  if(!addr){alert('Enter a wallet address!');return;}
+  const btn=document.getElementById('trackBtn');
+  btn.disabled=true;btn.textContent='⟳ Loading...';
+  document.getElementById('content').innerHTML='<div class="state"><div class="spinner"></div><div class="state-title">Fetching wallet data...</div><div class="state-sub" style="font-family:var(--mono);color:var(--dim)">'+addr+'</div></div>';
+  try{
+    const d=await apiFetch('/solana-mainnet/address/'+addr+'/balances_v2/');
+    const raw=d.data&&d.data.items?d.data.items:[];
+    const all=raw.filter(i=>(i.quote||0)>0).sort((a,b)=>(b.quote||0)-(a.quote||0));
+    const clean=all.filter(i=>!i.is_spam);
+    const total=all.reduce((s,i)=>s+(i.quote||0),0);
+    const spam=all.filter(i=>i.is_spam).length;
+    const r=calcRisk(all);
+    const rClass=rc(r.s);
+    let rows='';
+    clean.slice(0,30).forEach(function(t,i){
+      const pct=total>0?(t.quote/total*100):0;
+      const bw=Math.max(3,Math.min(130,pct*1.3));
+      const name=t.contract_display_name||t.contract_name||'Unknown';
+      const sym=t.contract_ticker_symbol||short(t.contract_address);
+      const logo=t.logo_urls&&t.logo_urls.token_logo_url;
+      const icon=logo?'<div class="tok-logo"><img src="'+logo+'" alt="" onerror="this.parentNode.textContent=\''+(sym||'?')[0]+'\'"></div>':'<div class="tok-logo">'+(sym||'?')[0]+'</div>';
+      const price=t.quote_rate?'$'+t.quote_rate.toFixed(t.quote_rate<0.001?6:t.quote_rate<1?4:2):'—';
+      rows+='<tr><td class="mono dim-c">'+(i+1)+'</td><td><div class="tok-cell">'+icon+'<div><div class="tok-name">'+(name.length>22?name.slice(0,22)+'…':name)+'</div><div class="tok-sym">'+sym+'</div></div></div></td><td class="mono">'+fB(t.balance,t.contract_decimals)+'</td><td class="mono">'+price+'</td><td><div class="pct-wrap"><div class="pct-bar" style="width:'+bw+'px"></div><span class="pct-txt">'+pct.toFixed(1)+'%</span></div></td><td class="mono green">'+fU(t.quote)+'</td></tr>';
+    });
+    if(spam>0)rows+='<tr><td colspan="6" style="text-align:center;padding:14px;font-family:var(--mono);font-size:13px;color:var(--danger)">🚫 '+spam+' spam/dust tokens hidden</td></tr>';
+    document.getElementById('content').innerHTML=
+      '<div class="addr-bar fade"><div><div class="addr-lbl">Tracked Wallet</div><div class="addr-val">'+addr+'</div><div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:4px">Updated: '+new Date().toLocaleString()+'</div></div><button class="copy-btn" onclick="navigator.clipboard.writeText(\''+addr+'\');this.textContent=\'✓ Copied!\'">📋 Copy</button></div>'+
+      '<div class="stats-grid fade"><div class="stat"><div class="stat-lbl">Total Value</div><div class="stat-val g">'+fU(total)+'</div><div class="stat-sub">USD portfolio</div></div><div class="stat"><div class="stat-lbl">Tokens</div><div class="stat-val b">'+all.length+'</div><div class="stat-sub">'+spam+' spam filtered</div></div><div class="stat"><div class="stat-lbl">Largest Hold</div><div class="stat-val y">'+(clean[0]?fU(clean[0].quote):'—')+'</div><div class="stat-sub">'+(clean[0]&&clean[0].contract_ticker_symbol?clean[0].contract_ticker_symbol:'—')+'</div></div><div class="stat"><div class="stat-lbl">Risk Score</div><div class="stat-val c">'+r.s+'/100</div><div class="stat-sub">'+rl(r.s)+'</div></div></div>'+
+      '<div class="sec-head"><div class="sec-title">Risk Analysis</div></div><div class="risk-wrap fade"><div class="risk-circle '+rClass+'"><div class="risk-num '+rClass+'">'+r.s+'</div><div class="risk-sub-lbl">'+rl(r.s)+'</div></div><div class="risk-body"><div class="risk-title">Wallet Safety Assessment</div><div class="risk-flags">'+r.flags.map(function(f){return'<span class="rflag '+f.c+'">'+f.l+'</span>';}).join('')+'</div></div></div>'+
+      '<div class="sec-head"><div class="sec-title">Holdings</div><span class="sec-tag">'+clean.length+' tokens</span></div><div class="table-wrap fade"><table><thead><tr><th>#</th><th>Token</th><th>Balance</th><th>Price</th><th>Portfolio %</th><th>Value</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }catch(e){
+    console.error(e);
+    document.getElementById('content').innerHTML='<div class="state"><div class="state-icon">⚠️</div><div class="state-title">Could not load wallet data</div><div class="state-sub">'+e.message+'<br><br>If you see "Host not in allowlist" — GoldRush needs to whitelist your domain.<br>Join their Discord: <a href="https://discord.gg/amW6pVxCZ3" target="_blank">discord.gg/amW6pVxCZ3</a></div></div>';
+  }
+  btn.disabled=false;btn.textContent='🔍 Track Wallet';
+}
+function load(addr){document.getElementById('addrInput').value=addr;track();}
+document.addEventListener('DOMContentLoaded',function(){document.getElementById('addrInput').addEventListener('keypress',function(e){if(e.key==='Enter')track();});});
+</script>
+</body>
+</html>
