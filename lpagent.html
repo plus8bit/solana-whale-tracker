@@ -56,7 +56,8 @@ tr:last-child td{border-bottom:none}
 .step b{display:block;color:var(--green);margin-bottom:6px}
 .step span{color:var(--muted);font-size:13px;line-height:1.5}
 .state{padding:42px 18px;text-align:center;color:var(--muted);font-family:var(--mono)}
-.error{color:var(--red);font-size:12px;margin-top:10px;line-height:1.5}
+.status{font-size:12px;margin-top:10px;line-height:1.5;color:var(--muted)}
+.status.ok{color:var(--green)}.status.warn{color:var(--yellow)}.status.bad{color:var(--red)}
 footer{border-top:1px solid var(--border);padding:22px 28px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)}
 a{color:var(--green);text-decoration:none}
 @media(max-width:820px){header{padding:14px;align-items:flex-start;flex-direction:column}.hero{padding:28px 14px}.hero-inner,.layout,.flow{grid-template-columns:1fr}main{padding:14px}.grid{grid-template-columns:repeat(2,1fr)}h2{font-size:32px}.row{grid-template-columns:1fr}th:nth-child(4),td:nth-child(4){display:none}}
@@ -101,7 +102,7 @@ a{color:var(--green);text-decoration:none}
       </div>
       <button onclick="runAgent()">Run LP Signal Scan</button>
       <button class="secondary" onclick="loadDemo()">Use Demo Data</button>
-      <div class="error" id="error"></div>
+      <div class="status ok" id="status">Demo mode is loaded. Add an API key only when you want live LPAgent data.</div>
     </div>
   </div>
 </section>
@@ -155,8 +156,15 @@ function pct(n){return((Number(n)||0)).toFixed(2)+'%'}
 function short(a){return a?a.slice(0,5)+'...'+a.slice(-4):'n/a'}
 function poolScore(p){const fee=(p.fee_tvl_ratio||((p.vol_24h||0)*((p.fee||0)*100)/(p.tvl||1)));const organic=p.organic_score||0;const volume=Math.min(30,(p.vol_24h||0)/50000);const liquidity=Math.min(20,(p.tvl||0)/50000);const volatilityPenalty=Math.abs(p.price_24h_change||0)>25?18:0;return Math.max(0,Math.min(100,Math.round(fee*8+organic*.45+volume+liquidity-volatilityPenalty)))}
 async function lpFetch(path){const key=document.getElementById('apiKey').value.trim();if(!key)throw new Error('Add an LPAgent API key or use demo data.');const r=await fetch(API+path,{headers:{'x-api-key':key,'accept':'application/json'}});if(!r.ok)throw new Error('LPAgent API error: '+r.status+' '+await r.text());return r.json()}
+function setStatus(text,type){const el=document.getElementById('status');el.textContent=text;el.className='status '+(type||'ok')}
 async function runAgent(){
-  document.getElementById('error').textContent='';
+  const key=document.getElementById('apiKey').value.trim();
+  if(!key){
+    loadDemo();
+    setStatus('Demo mode loaded. To run a live scan, paste your LPAgent API key from portal.lpagent.io first. Do not commit that key to GitHub.', 'warn');
+    return;
+  }
+  setStatus('Running live LPAgent scan...', 'ok');
   document.getElementById('poolTable').innerHTML='<div class="state">Scanning LPAgent pools...</div>';
   try{
     const sortBy=document.getElementById('sortBy').value;
@@ -165,12 +173,13 @@ async function runAgent(){
     const pools=(poolsRes.data||[]).map(p=>({...p,score:poolScore(p)})).sort((a,b)=>b.score-a.score);
     let lpers=[];
     if(pools[0]&&pools[0].pool){
-      try{const lpRes=await lpFetch('/pools/'+pools[0].pool+'/top-lpers?order_by=roi&sort_order=desc&page=1&limit=5');lpers=lpRes.data||[]}catch(e){document.getElementById('error').textContent='Top LPers is premium, so the pool scan still works while LP watchlist uses demo examples.';lpers=demoLpers}
+      try{const lpRes=await lpFetch('/pools/'+pools[0].pool+'/top-lpers?order_by=roi&sort_order=desc&page=1&limit=5');lpers=lpRes.data||[]}catch(e){setStatus('Live pool scan worked. Top LPers may require Premium access, so demo LP wallets are shown for that section.', 'warn');lpers=demoLpers}
     }
     render(pools,lpers,false);
-  }catch(e){document.getElementById('error').textContent=e.message;loadDemo()}
+    setStatus('Live LPAgent scan loaded successfully.', 'ok');
+  }catch(e){loadDemo();setStatus('Live scan failed, so demo mode is shown instead: '+e.message, 'bad')}
 }
-function loadDemo(){render(demoPools.map(p=>({...p,score:poolScore(p)})),demoLpers,true)}
+function loadDemo(){render(demoPools.map(p=>({...p,score:poolScore(p)})),demoLpers,true);setStatus('Demo mode loaded with sample Meteora pools and LP wallets. No API key is used.', 'ok')}
 function render(pools,lpers,isDemo){
   const best=pools[0]||{};
   document.getElementById('poolsCount').textContent=pools.length;
