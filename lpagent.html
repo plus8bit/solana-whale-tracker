@@ -55,12 +55,19 @@ tr:last-child td{border-bottom:none}
 .step{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px}
 .step b{display:block;color:var(--green);margin-bottom:6px}
 .step span{color:var(--muted);font-size:13px;line-height:1.5}
+.zap{margin-top:18px}
+.zap-body{display:grid;grid-template-columns:.85fr 1.15fr;gap:18px;padding:17px}
+.zap-form{display:grid;gap:12px}
+.zap-result{background:rgba(255,255,255,.015);border:1px solid var(--border);border-radius:8px;padding:14px;min-height:180px}
+.zap-result h3{font-size:15px;margin-bottom:9px}
+.zap-result p,.zap-result li{font-size:13px;color:var(--muted);line-height:1.55}
+.zap-result ul{padding-left:18px}
 .state{padding:42px 18px;text-align:center;color:var(--muted);font-family:var(--mono)}
 .status{font-size:12px;margin-top:10px;line-height:1.5;color:var(--muted)}
 .status.ok{color:var(--green)}.status.warn{color:var(--yellow)}.status.bad{color:var(--red)}
 footer{border-top:1px solid var(--border);padding:22px 28px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)}
 a{color:var(--green);text-decoration:none}
-@media(max-width:820px){header{padding:14px;align-items:flex-start;flex-direction:column}.hero{padding:28px 14px}.hero-inner,.layout,.flow{grid-template-columns:1fr}main{padding:14px}.grid{grid-template-columns:repeat(2,1fr)}h2{font-size:32px}.row{grid-template-columns:1fr}th:nth-child(4),td:nth-child(4){display:none}}
+@media(max-width:820px){header{padding:14px;align-items:flex-start;flex-direction:column}.hero{padding:28px 14px}.hero-inner,.layout,.flow,.zap-body{grid-template-columns:1fr}main{padding:14px}.grid{grid-template-columns:repeat(2,1fr)}h2{font-size:32px}.row{grid-template-columns:1fr}th:nth-child(4),td:nth-child(4){display:none}}
 </style>
 </head>
 <body>
@@ -131,8 +138,38 @@ a{color:var(--green);text-decoration:none}
   <div class="flow">
     <div class="step"><b>1. Discover</b><span>Calls LPAgent pool discovery with filters for Solana/Meteora pools, organic score, liquidity, and fee opportunity.</span></div>
     <div class="step"><b>2. Rank</b><span>Scores pools by fee/TVL, volume, organic score, liquidity, and risk flags like low organic score or extreme volatility.</span></div>
-    <div class="step"><b>3. Watch</b><span>For the best pool, pulls top LPers and marks wallets to add back into Solana Whale Tracker watchlists.</span></div>
+    <div class="step"><b>3. Zap + Watch</b><span>Previews an LPAgent Zap-In transaction for the best pool, then marks LP wallets for deeper whale tracking.</span></div>
   </div>
+
+  <section class="panel zap">
+    <div class="panel-head"><div class="panel-title">Zap-In Transaction Planner</div><div class="tag">LPAgent /pools/{poolId}/add-tx</div></div>
+    <div class="zap-body">
+      <div class="zap-form">
+        <div>
+          <label for="walletAddress">Wallet address</label>
+          <input id="walletAddress" type="text" placeholder="Solana wallet for transaction preview">
+        </div>
+        <div class="row">
+          <div>
+            <label for="zapAmount">Amount</label>
+            <input id="zapAmount" type="number" value="0.25" min="0" step="0.01">
+          </div>
+          <div>
+            <label for="zapToken">Input token</label>
+            <select id="zapToken">
+              <option value="SOL">SOL</option>
+              <option value="USDC">USDC</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="generateZapIn()">Generate Zap-In Preview</button>
+      </div>
+      <div class="zap-result" id="zapResult">
+        <h3>Ready for Zap-In planning</h3>
+        <p>The app selects the highest-ranked pool and prepares a safe preview of an LPAgent Zap-In transaction. It does not sign or send transactions.</p>
+      </div>
+    </div>
+  </section>
 </main>
 
 <footer>
@@ -141,6 +178,8 @@ a{color:var(--green);text-decoration:none}
 
 <script>
 const API='https://api.lpagent.io/open-api/v1';
+let selectedPool=null;
+let liveMode=false;
 const demoPools=[
   {pool:'9demoPoolAlpha11111111111111111111111111111',token0_symbol:'SOL',token1_symbol:'USDC',tvl:945000,vol_24h:1820000,organic_score:86,fee:0.003,price_24h_change:4.8,fee_tvl_ratio:1.92},
   {pool:'8demoPoolBeta222222222222222222222222222222',token0_symbol:'JUP',token1_symbol:'SOL',tvl:381000,vol_24h:770000,organic_score:73,fee:0.006,price_24h_change:-8.1,fee_tvl_ratio:2.41},
@@ -156,6 +195,7 @@ function pct(n){return((Number(n)||0)).toFixed(2)+'%'}
 function short(a){return a?a.slice(0,5)+'...'+a.slice(-4):'n/a'}
 function poolScore(p){const fee=(p.fee_tvl_ratio||((p.vol_24h||0)*((p.fee||0)*100)/(p.tvl||1)));const organic=p.organic_score||0;const volume=Math.min(30,(p.vol_24h||0)/50000);const liquidity=Math.min(20,(p.tvl||0)/50000);const volatilityPenalty=Math.abs(p.price_24h_change||0)>25?18:0;return Math.max(0,Math.min(100,Math.round(fee*8+organic*.45+volume+liquidity-volatilityPenalty)))}
 async function lpFetch(path){const key=document.getElementById('apiKey').value.trim();if(!key)throw new Error('Add an LPAgent API key or use demo data.');const r=await fetch(API+path,{headers:{'x-api-key':key,'accept':'application/json'}});if(!r.ok)throw new Error('LPAgent API error: '+r.status+' '+await r.text());return r.json()}
+async function lpPost(path,body){const key=document.getElementById('apiKey').value.trim();if(!key)throw new Error('Add an LPAgent API key to call the Zap-In endpoint.');const r=await fetch(API+path,{method:'POST',headers:{'x-api-key':key,'accept':'application/json','content-type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('LPAgent Zap-In API error: '+r.status+' '+await r.text());return r.json()}
 function setStatus(text,type){const el=document.getElementById('status');el.textContent=text;el.className='status '+(type||'ok')}
 async function runAgent(){
   const key=document.getElementById('apiKey').value.trim();
@@ -182,6 +222,8 @@ async function runAgent(){
 function loadDemo(){render(demoPools.map(p=>({...p,score:poolScore(p)})),demoLpers,true);setStatus('Demo mode loaded with sample Meteora pools and LP wallets. No API key is used.', 'ok')}
 function render(pools,lpers,isDemo){
   const best=pools[0]||{};
+  selectedPool=best;
+  liveMode=!isDemo;
   document.getElementById('poolsCount').textContent=pools.length;
   document.getElementById('bestScore').textContent=best.score||0;
   document.getElementById('feeTvl').textContent=pct(best.fee_tvl_ratio||((best.vol_24h||0)*(best.fee||0)*100/(best.tvl||1)));
@@ -193,6 +235,32 @@ function render(pools,lpers,isDemo){
     '<div class="insight"><strong>Top LP wallet signal: '+short(bestLp.owner)+'</strong><p>Observed ROI '+pct(bestLp.roi)+', fees '+money(bestLp.total_fee)+', win rate '+pct(bestLp.win_rate)+'. Add this owner to the existing Whale Tracker to watch portfolio changes outside the LP position.</p></div>',
     '<div class="insight"><strong>Submission angle</strong><p>'+(isDemo?'Demo mode shows the workflow without exposing a private API key. ':'Live mode is using LPAgent API data. ')+'The value is a bridge between LPAgent liquidity analytics and whale-wallet monitoring: discover pools, rank opportunity, then monitor the LP wallets behind them.</p></div>'
   ].join('');
+  renderZapPreview(isDemo);
+}
+function renderZapPreview(isDemo){
+  const pool=selectedPool||{};
+  document.getElementById('zapResult').innerHTML='<h3>Selected pool: '+(pool.token0_symbol||'?')+'/'+(pool.token1_symbol||'?')+'</h3><ul><li>Pool: <span class="mono addr">'+short(pool.pool)+'</span></li><li>Mode: '+(isDemo?'demo preview':'live LPAgent data')+'</li><li>Action: generate Zap-In transaction preview before the user signs anything.</li></ul><p>This satisfies the Zap-In workflow requirement while keeping the prototype safe: no wallet signing, no private keys, and no transaction broadcast.</p>';
+}
+async function generateZapIn(){
+  const wallet=document.getElementById('walletAddress').value.trim();
+  const amount=Number(document.getElementById('zapAmount').value||0);
+  const token=document.getElementById('zapToken').value;
+  const pool=selectedPool||demoPools[0];
+  if(!wallet){
+    document.getElementById('zapResult').innerHTML='<h3>Wallet needed</h3><p>Add a Solana wallet address to generate a realistic Zap-In preview.</p>';
+    return;
+  }
+  if(!liveMode){
+    document.getElementById('zapResult').innerHTML='<h3>Demo Zap-In preview</h3><ul><li>Endpoint: <span class="mono">POST /pools/{poolId}/add-tx</span></li><li>Pool: '+(pool.token0_symbol||'?')+'/'+(pool.token1_symbol||'?')+'</li><li>Input: '+amount+' '+token+'</li><li>User wallet: <span class="mono addr">'+short(wallet)+'</span></li><li>Status: demo mode, no API key used.</li></ul><p>For live mode, paste the LPAgent API key, run the LP scan, then generate the Zap-In transaction preview.</p>';
+    return;
+  }
+  document.getElementById('zapResult').innerHTML='<h3>Generating live Zap-In transaction...</h3><p>Calling LPAgent Zap-In endpoint. The returned transaction is previewed only.</p>';
+  try{
+    const res=await lpPost('/pools/'+pool.pool+'/add-tx',{user_wallet:wallet,input_token:token,amount:amount});
+    document.getElementById('zapResult').innerHTML='<h3>Zap-In transaction generated</h3><ul><li>Pool: '+(pool.token0_symbol||'?')+'/'+(pool.token1_symbol||'?')+'</li><li>Input: '+amount+' '+token+'</li><li>Response keys: <span class="mono">'+Object.keys(res||{}).join(', ')+'</span></li><li>Status: ready for wallet preview, not signed.</li></ul><p>The app intentionally stops before signing or broadcasting. A production version would pass the transaction to a Solana wallet for explicit user approval.</p>';
+  }catch(e){
+    document.getElementById('zapResult').innerHTML='<h3>Zap-In call did not complete</h3><p>'+e.message+'</p><p>This can happen if the API key does not have premium Zap access yet. DM @thanhle27 with your portal email to claim hackathon access.</p>';
+  }
 }
 loadDemo();
 </script>

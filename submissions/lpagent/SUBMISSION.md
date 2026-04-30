@@ -14,7 +14,7 @@ Original project:
 
 ## One-liner
 
-An agent that discovers high-signal Meteora pools with LPAgent.io, ranks them by opportunity/risk, then identifies top LP wallets to monitor with Solana Whale Tracker.
+An agent that discovers high-signal Meteora pools with LPAgent.io, ranks them by opportunity/risk, previews a Zap-In transaction, then identifies top LP wallets to monitor with Solana Whale Tracker.
 
 ## Why this fits LPAgent
 
@@ -23,6 +23,7 @@ LPAgent is focused on AI-powered liquidity management for Meteora on Solana. Thi
 - pool discovery via `/pools/discover`
 - pool opportunity ranking using TVL, 24h volume, organic score, volatility, and fee/TVL
 - top LP wallet discovery via `/pools/{poolId}/top-lpers`
+- Zap-In transaction planning via `/pools/{poolId}/add-tx`
 - LP wallet follow-up through the existing Solana Whale Tracker workflow
 
 ## What is built
@@ -32,6 +33,7 @@ LPAgent is focused on AI-powered liquidity management for Meteora on Solana. Thi
 - Demo mode for judges who do not want to paste a key during the first review.
 - Pool ranking dashboard.
 - Agent summary explaining the best pool, top LP wallet, and next action.
+- Zap-In Transaction Planner that previews an LPAgent Zap-In workflow without signing or broadcasting transactions.
 - Submission docs, demo script, and deployment checklist.
 
 ## User
@@ -50,6 +52,7 @@ The prototype calls:
 ```txt
 GET https://api.lpagent.io/open-api/v1/pools/discover
 GET https://api.lpagent.io/open-api/v1/pools/{poolId}/top-lpers
+POST https://api.lpagent.io/open-api/v1/pools/{poolId}/add-tx
 ```
 
 Authentication:
@@ -58,7 +61,7 @@ Authentication:
 x-api-key: <LPAGENT_API_KEY>
 ```
 
-Note: `top-lpers` may require a Premium or Enterprise API key. The app handles that by keeping the pool scan live and using demo LP wallet examples for the watchlist if the premium call is unavailable.
+Note: `top-lpers` and Zap-In may require Premium or Enterprise API access. The app handles that by keeping demo mode available for reviewers and by clearly explaining when live premium access is needed.
 
 ## Judging narrative
 
@@ -67,9 +70,10 @@ Most wallet trackers stop at balances. LP Whale Signal Agent connects wallet int
 This creates a practical loop:
 
 1. Discover profitable LP opportunities.
-2. Identify the LP wallets with good historical behavior.
-3. Track those wallets across the broader Solana ecosystem.
-4. Use the signals for alerts, research, and future automated LP actions.
+2. Preview a Zap-In transaction before any signing.
+3. Identify the LP wallets with good historical behavior.
+4. Track those wallets across the broader Solana ecosystem.
+5. Use the signals for alerts, research, and future automated LP actions.
 
 ## Roadmap
 

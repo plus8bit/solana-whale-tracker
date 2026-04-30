@@ -16,11 +16,13 @@ First, I can paste an LPAgent API key and run a Solana Meteora pool scan. The ap
 
 Here the agent identifies the best pool to monitor. Instead of only showing raw data, it turns the data into a decision: this pool has strong activity, acceptable organic score, and enough liquidity to deserve deeper research.
 
-Then the agent checks top LPers for the selected pool. These LP wallets become watchlist targets. The important part is the bridge with my existing Solana Whale Tracker: once we find a strong LP wallet, we can track its broader Solana portfolio and behavior.
+Then the app includes a Zap-In Transaction Planner. The goal is not to sign or send funds in the demo. The goal is to show the LPAgent Zap-In workflow: choose the highest-ranked pool, enter a wallet and amount, and generate a transaction preview before user approval.
+
+After that, the agent checks top LPers for the selected pool. These LP wallets become watchlist targets. The important part is the bridge with my existing Solana Whale Tracker: once we find a strong LP wallet, we can track its broader Solana portfolio and behavior.
 
 ## Why LPAgent
 
-LPAgent gives the app the liquidity intelligence layer: pool discovery, LP position data, and top LP ranking. My project adds the whale-tracking and alerting layer on top.
+LPAgent gives the app the liquidity intelligence layer: pool discovery, Zap-In transaction generation, LP position data, and top LP ranking. My project adds the whale-tracking and alerting layer on top.
 
 ## Close
 
