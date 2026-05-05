@@ -7,6 +7,8 @@ let qvacState = {
   lastError: null
 };
 
+const LOCAL_MODEL_TYPE = "llamacpp-completion";
+
 export function getQvacStatus() {
   return {
     ...qvacState,
@@ -44,32 +46,42 @@ export async function runLocalInference({ compactText, profile, emit }) {
     const modelId = await ensureModelLoaded(qvac, emit);
     emit({ type: "log", level: "info", message: `qvac.completion.start model=${shortId(modelId)}` });
 
-    const result = qvac.completion({
-      modelId,
-      stream: true,
-      history: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      generationParams: {
-        temperature: 0.15,
-        top_p: 0.85
-      }
-    });
-
     let text = "";
-    for await (const token of result.tokenStream) {
-      text += token;
-      emit({ type: "token", token });
-    }
+    let stats;
 
-    const stats = await result.stats;
-    emit({ type: "log", level: "info", message: `qvac.completion.done tokens=${text.length} stats=${Boolean(stats)}` });
+    try {
+      const result = qvac.completion({
+        modelId,
+        stream: true,
+        history: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        generationParams: {
+          temp: 0.15,
+          top_p: 0.85,
+          predict: Number(process.env.QVAC_COMPLETION_PREDICT || process.env.QVAC_PREDICT || 700)
+        }
+      });
+
+      for await (const token of result.tokenStream) {
+        text += token;
+        emit({ type: "token", token });
+      }
+
+      stats = await result.stats;
+      emit({ type: "log", level: "info", message: `qvac.completion.done tokens=${text.length} stats=${Boolean(stats)}` });
+    } catch (error) {
+      const message = formatQvacError(error);
+      emit({ type: "log", level: "error", message: `QVAC completion failed: ${message}` });
+      throw new Error(message);
+    }
 
     return normalizeAnalysis(text, profile, "qvac-local-inference", stats);
   } catch (error) {
-    qvacState.lastError = error.message;
-    emit({ type: "log", level: "warn", message: `qvac.fallback.reason=${error.message}` });
+    const message = formatQvacError(error);
+    qvacState.lastError = message;
+    emit({ type: "log", level: "warn", message: `qvac.fallback.reason=${message}` });
     return deterministicAnalysis(profile);
   }
 }
@@ -77,29 +89,46 @@ export async function runLocalInference({ compactText, profile, emit }) {
 async function ensureModelLoaded(qvac, emit) {
   if (qvacState.modelId) return qvacState.modelId;
 
-  const modelSrc = process.env.QVAC_MODEL_SRC || qvac.LLAMA_3_2_1B_INST_Q4_0;
+  const modelSrc = resolveModelSrc(qvac);
   if (!modelSrc) throw new Error("No QVAC model source available. Set QVAC_MODEL_SRC.");
 
-  qvacState.modelSrc = typeof modelSrc === "string" ? modelSrc : modelSrc.name || "registry-model";
-  emit({ type: "log", level: "info", message: `qvac.loadModel.start modelSrc=${qvacState.modelSrc}` });
+  const modelSourceKind = process.env.QVAC_MODEL_SRC ? "filesystem" : "registry";
+  qvacState.modelSrc = typeof modelSrc === "string" ? modelSrc : modelSrc.name || modelSrc.src || "registry-model";
+  emit({ type: "log", level: "info", message: `qvac.loadModel.start source=${modelSourceKind} modelSrc=${qvacState.modelSrc}` });
 
-  qvacState.modelId = await qvac.loadModel({
-    modelSrc,
-    modelType: process.env.QVAC_MODEL_TYPE || "llamacpp-completion",
-    modelConfig: {
-      device: process.env.QVAC_DEVICE || "cpu",
-      ctx_size: Number(process.env.QVAC_CTX_SIZE || 4096),
-      predict: Number(process.env.QVAC_PREDICT || 700),
-      verbosity: qvac.VERBOSITY?.ERROR
-    },
-    onProgress: (progress) => {
-      emit({ type: "model-progress", progress: sanitizeProgress(progress) });
-    }
-  });
+  try {
+    qvacState.modelId = await qvac.loadModel({
+      modelSrc,
+      modelType: process.env.QVAC_MODEL_TYPE || LOCAL_MODEL_TYPE,
+      modelConfig: compactObject({
+        device: process.env.QVAC_DEVICE || "cpu",
+        ctx_size: Number(process.env.QVAC_CTX_SIZE || 4096),
+        predict: Number(process.env.QVAC_PREDICT || 700),
+        verbosity: qvac.VERBOSITY?.ERROR
+      }),
+      onProgress: (progress) => {
+        emit({ type: "model-progress", progress: sanitizeProgress(progress) });
+      }
+    });
+  } catch (error) {
+    const message = formatQvacError(error);
+    qvacState.lastError = message;
+    emit({ type: "log", level: "error", message: `QVAC SDK init failed: ${message}` });
+    throw new Error(message);
+  }
 
   qvacState.modelLoaded = true;
   emit({ type: "log", level: "info", message: `qvac.loadModel.done modelId=${shortId(qvacState.modelId)}` });
   return qvacState.modelId;
+}
+
+function resolveModelSrc(qvac) {
+  const localPath = process.env.QVAC_MODEL_SRC?.trim();
+  if (localPath) {
+    return localPath;
+  }
+
+  return qvac.LLAMA_3_2_1B_INST_Q4_0;
 }
 
 function normalizeAnalysis(text, profile, mode, stats) {
@@ -158,6 +187,31 @@ function parseJsonObject(text) {
   } catch {
     return null;
   }
+}
+
+function compactObject(value) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined && item !== null && item !== "")
+  );
+}
+
+function formatQvacError(error) {
+  const raw = error instanceof Error ? error.message : String(error);
+  const normalized = raw.replace(/\s+/g, " ").trim();
+
+  if (normalized.includes("generationParams") && normalized.includes("temperature")) {
+    return "QVAC completion schema rejected generationParams.temperature; use generationParams.temp.";
+  }
+
+  if (
+    normalized.includes("modelRegistryGetModel") &&
+    normalized.includes("registryPath") &&
+    normalized.includes("registrySource")
+  ) {
+    return "QVAC RPC schema rejected the request payload. Local GGUF models must be passed as modelSrc filesystem path strings, not registry descriptor objects.";
+  }
+
+  return normalized.length > 320 ? `${normalized.slice(0, 320)}...` : normalized;
 }
 
 function sanitizeProgress(progress) {
