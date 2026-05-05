@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 150 21% 4%;
+    --foreground: 150 60% 96%;
+    --muted: 160 16% 13%;
+    --muted-foreground: 164 18% 68%;
+    --border: 160 42% 18%;
+    --input: 160 42% 18%;
+    --ring: 154 76% 56%;
+    --primary: 154 76% 56%;
+    --primary-foreground: 154 80% 6%;
+    --radius: 0.9rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background:
+      linear-gradient(135deg, rgba(35, 233, 161, 0.1) 0%, rgba(96, 216, 255, 0.08) 36%, transparent 68%),
+      linear-gradient(180deg, #07100d 0%, #050706 44%, #030403 100%);
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply border border-emerald-200/10 bg-zinc-950/55 shadow-2xl shadow-black/30 backdrop-blur-xl;
+  }
+
+  .terminal-grid {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+}
