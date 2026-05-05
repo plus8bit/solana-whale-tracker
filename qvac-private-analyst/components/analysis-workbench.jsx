@@ -100,6 +100,12 @@ export function AnalysisWorkbench() {
     { label: "AI mode", value: analysis?.mode?.replaceAll("-", " ") || "idle", icon: BrainCircuit }
   ], [analysis, profile, snapshot]);
 
+  const localTextReport = analysis?.mode === "qvac-local-inference" && Boolean(analysis?.parseWarning || analysis?.rawText);
+  const structuredVerdict = localTextReport
+    ? "Local model generated a text report. See Inference Terminal for details."
+    : analysis?.verdict || "Run analysis to generate a local verdict.";
+  const visiblePatterns = localTextReport ? [] : (analysis?.patterns || []);
+
   return (
     <section className="relative mx-auto max-w-7xl px-4 pb-10">
       <div className="grid gap-4 lg:grid-cols-[400px_minmax(0,1fr)]">
@@ -172,10 +178,18 @@ export function AnalysisWorkbench() {
               <CardContent className="space-y-4">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/45">Verdict</p>
-                  <p className="mt-2 text-sm leading-6 text-emerald-50/78">{analysis?.verdict || "Run analysis to generate a local verdict."}</p>
+                  <p className="mt-2 text-sm leading-6 text-emerald-50/78">{structuredVerdict}</p>
                 </div>
+                {localTextReport ? (
+                  <div className="rounded-lg border border-emerald-200/10 bg-emerald-400/[0.06] p-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/45">Parser state</p>
+                    <p className="mt-2 text-xs leading-5 text-emerald-50/60">
+                      JSON schema was not detected in the local model response. The streamed Markdown/text output is preserved in the terminal.
+                    </p>
+                  </div>
+                ) : null}
                 <div className="space-y-2">
-                  {(analysis?.patterns || []).map((pattern, index) => (
+                  {visiblePatterns.map((pattern, index) => (
                     <div key={`${pattern.name}-${index}`} className="rounded-lg border border-emerald-200/10 bg-white/[0.03] p-3">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-semibold text-white">{pattern.name}</p>
